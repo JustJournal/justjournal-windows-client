@@ -107,7 +107,7 @@ namespace JustJournal
             this.linkLabel1.Size = new System.Drawing.Size(368, 23);
             this.linkLabel1.TabIndex = 10;
             this.linkLabel1.TabStop = true;
-            this.linkLabel1.Text = "http://www.justjournal.com";
+            this.linkLabel1.Text = "https://www.justjournal.com";
             this.linkLabel1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.linkLabel1.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel1_LinkClicked);
             // 
@@ -168,7 +168,7 @@ namespace JustJournal
 
 		private void linkLabel1_LinkClicked(object sender, System.Windows.Forms.LinkLabelLinkClickedEventArgs e)
 		{
-			System.Diagnostics.Process.Start("http://www.justjournal.com/");
+			System.Diagnostics.Process.Start("https://www.justjournal.com/");
 		}
 
         private void label1_Click(object sender, EventArgs e)

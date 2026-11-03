@@ -1,9 +1,11 @@
 using System;
 using System.Collections;
-using System.Collections.Specialized;
+using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Text;
 using System.Reflection;
+using System.Web.Script.Serialization;
 
 namespace JustJournal
 {
@@ -12,7 +14,7 @@ namespace JustJournal
 	/// </summary>
 	public static class JustJournalCore
 	{
-        private const string Server = "www.justjournal.com";
+        public const string Server = "www.justjournal.com";
 
         private static bool _loggedIn;
 		private static string _userName;
@@ -183,71 +185,201 @@ namespace JustJournal
 		}
 
 		/* Methods */
-		public static bool Login()
+
+		// Login status values from /api/login and /api/login/2fa
+		public const string LoginOk = "JJ.LOGIN.OK";
+		public const string LoginFail = "JJ.LOGIN.FAIL";
+		public const string LoginTwoFactorNeeded = "JJ.LOGIN.2FA";
+
+		private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
+
+		// The session cookie from /api/login, kept in memory only.
+		private static CookieContainer _cookies = new CookieContainer();
+
+		private static string _twoFactorMethod;
+
+		/// <summary>
+		/// How the second factor is delivered (EMAIL or TOTP) after Login() returns LoginTwoFactorNeeded.
+		/// </summary>
+		public static string TwoFactorMethod
 		{
-			string uriString;
-			WebClient client = new WebClient();	
-			if (_useSsl)
-                uriString = "https://";
-			else
-			    uriString = "http://";
-			 
-			uriString += Server + "/loginAccount";
-			
-			// Create a new NameValueCollection instance to hold some custom parameters to be posted to the URL.
-			NameValueCollection myNameValueCollection = new NameValueCollection();
+			get
+			{
+				return _twoFactorMethod;
+			}
+		}
 
-			// Add a user agent header in case the 
-			// requested URI contains a query.
-			client.Headers.Add("User-Agent", Version);
+		public static string BaseUrl
+		{
+			get
+			{
+				return (_useSsl ? "https://" : "http://") + Server;
+			}
+		}
 
-			myNameValueCollection.Add("username", _userName);            
-			myNameValueCollection.Add("password", _password);
-			myNameValueCollection.Add("password_hash", "");
+		static JustJournalCore()
+		{
+			// .NET 4.5 doesn't offer TLS 1.2 by default
+			ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+		}
 
-			byte[] responseArray = client.UploadValues(uriString,"POST",myNameValueCollection);
-			//Encoding.ASCII.GetString(responseArray)
+		/// <summary>
+		/// Log in with UserName and Password.
+		/// </summary>
+		/// <returns>LoginOk, LoginTwoFactorNeeded (finish with LoginTwoFactor), or LoginFail</returns>
+		public static string Login()
+		{
+			// a new login starts a new session
+			_cookies = new CookieContainer();
+			_twoFactorMethod = null;
 
-			string resp = Encoding.ASCII.GetString(responseArray);
-			_debug = resp;
-			return resp.Length <= 0 || resp.IndexOf("JJ.LOGIN.OK", StringComparison.Ordinal) != -1;
+			var login = new Dictionary<string, object>
+				{
+					{"username", _userName},
+					{"password", _password}
+				};
+
+			HttpStatusCode status;
+			var resp = SendJson("POST", BaseUrl + "/api/login", login, out status);
+			var loginStatus = LoginStatus(resp);
+
+			if (loginStatus == LoginTwoFactorNeeded && resp.ContainsKey("twoFactorMethod"))
+				_twoFactorMethod = Convert.ToString(resp["twoFactorMethod"]);
+
+			_loggedIn = loginStatus == LoginOk;
+			return loginStatus;
+		}
+
+		/// <summary>
+		/// Finish a login that returned LoginTwoFactorNeeded.
+		/// </summary>
+		/// <param name="code">code from the e-mail, authenticator app or recovery list</param>
+		/// <param name="retry">true when only the code was wrong; false when the login must start over</param>
+		/// <returns>LoginOk or LoginFail</returns>
+		public static string LoginTwoFactor(string code, out bool retry)
+		{
+			var body = new Dictionary<string, object>
+				{
+					{"code", code},
+					{"rememberDevice", false}
+				};
+
+			HttpStatusCode status;
+			var resp = SendJson("POST", BaseUrl + "/api/login/2fa", body, out status);
+			var loginStatus = LoginStatus(resp);
+
+			// 401 JJ.LOGIN.FAIL is a wrong code; 429 means too many wrong codes, and
+			// JJ.LOGIN.NONE means the pending login expired
+			retry = loginStatus == LoginFail && status == HttpStatusCode.Unauthorized;
+
+			_loggedIn = loginStatus == LoginOk;
+			return loginStatus == LoginOk ? LoginOk : LoginFail;
+		}
+
+		private static string LoginStatus(Dictionary<string, object> resp)
+		{
+			if (resp != null && resp.ContainsKey("status"))
+				return Convert.ToString(resp["status"]);
+			return LoginFail;
+		}
+
+		/// <summary>
+		/// Send a JSON request with the session cookie and parse the JSON object that comes back.
+		/// Error statuses are returned rather than thrown so callers can read the error body.
+		/// </summary>
+		/// <returns>the parsed object, or an empty one when the body isn't a JSON object</returns>
+		public static Dictionary<string, object> SendJson(string method, string uriString, object body,
+		                                                  out HttpStatusCode status)
+		{
+			var resp = Send(method, uriString, body, out status);
+			try
+			{
+				return Json.Deserialize<Dictionary<string, object>>(resp) ?? new Dictionary<string, object>();
+			}
+			catch (ArgumentException)
+			{
+				return new Dictionary<string, object>();
+			}
+			catch (InvalidOperationException)
+			{
+				return new Dictionary<string, object>();
+			}
+		}
+
+		private static string Send(string method, string uriString, object body, out HttpStatusCode status)
+		{
+			var request = (HttpWebRequest) WebRequest.Create(uriString);
+			request.Method = method;
+			request.UserAgent = Version;
+			// the login and mood endpoints only answer a wildcard Accept header
+			request.Accept = "*/*";
+			request.CookieContainer = _cookies;
+
+			if (body != null)
+			{
+				byte[] data = Encoding.UTF8.GetBytes(Json.Serialize(body));
+				request.ContentType = "application/json";
+				request.ContentLength = data.Length;
+				using (Stream stream = request.GetRequestStream())
+					stream.Write(data, 0, data.Length);
+			}
+
+			HttpWebResponse response;
+			try
+			{
+				response = (HttpWebResponse) request.GetResponse();
+			}
+			catch (WebException ex)
+			{
+				response = ex.Response as HttpWebResponse;
+				if (response == null)
+					throw;
+			}
+
+			using (response)
+			using (var reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
+			{
+				status = response.StatusCode;
+				var resp = reader.ReadToEnd();
+				_debug = resp;
+				return resp;
+			}
 		}
 
 		public static void RetrieveMoods()
 		{
+            List<Dictionary<string, object>> list = null;
             try
             {
-                var client = new WebClient();
-                var uriString = "http://" + Server + "/moodlist.h";
-
-                client.Headers.Add("User-Agent", Version);
-                byte[] responseArray = client.DownloadData(uriString);
-                var resp = Encoding.UTF8.GetString(responseArray);
-                var xdoc = new System.Xml.XmlDocument();
-                xdoc.LoadXml(resp);
-
-                var nl = xdoc.SelectNodes("model/moods/*");
-
-                moods.Clear();  // clear the list
-                System.Diagnostics.Debug.Assert(nl != null, "nl != null");
-                for (var n = 0; n < nl.Count; n++)
-                {
-                    var xmlNode = nl.Item(n);
-                    if (xmlNode != null)
-                    {
-                        var item = xmlNode.ChildNodes.Item(0);
-                        if (item != null)
-                        {
-                            var node = xmlNode.ChildNodes.Item(2);
-                            if (node != null)
-                                moods.Add(new Mood(item.InnerText, node.InnerText));
-                        }
-                    }
-                }
+                HttpStatusCode status;
+                var resp = Send("GET", "https://" + Server + "/api/mood", null, out status);
+                if (status == HttpStatusCode.OK)
+                    list = Json.Deserialize<List<Dictionary<string, object>>>(resp);
             }
-            catch (System.IO.IOException)
+            // list stays null and the alert below covers each of these
+            catch (IOException)
+            {
+            }
+            catch (ArgumentException)
+            {
+                // not JSON
+            }
+            catch (InvalidOperationException)
+            {
+                // includes WebException
+            }
+
+            if (list == null)
             {
                new Alert("Error loading Moods from JJ Server. Please restart just journal and try again later.", "");
+               return;
+            }
+
+            moods.Clear();  // clear the list
+            foreach (var mood in list)
+            {
+                if (mood.ContainsKey("id") && mood.ContainsKey("title"))
+                    moods.Add(new Mood(Convert.ToString(mood["title"]), Convert.ToString(mood["id"])));
             }
 		}
 

@@ -1,8 +1,9 @@
 using System;
 using System.Collections;
-using System.Collections.Specialized;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
@@ -214,99 +215,97 @@ namespace JustJournal
             Enabled = false;
             Cursor = Cursors.WaitCursor;
 
-            var client = new WebClient();
-            string uriString;
-            if (JustJournalCore.EnableSsl)
-                uriString = "https://";
-            else
-                uriString = "http://";
-            uriString += "www.justjournal.com/updateJournal";
+            // Build the entry for POST /api/entry.
+            var entry = new Dictionary<string, object>();
 
-            // Create a new NameValueCollection instance to hold some custom parameters to be posted to the URL.
-            var myNameValueCollection = new NameValueCollection();
-
-            // Add a user agent header in case the 
-            // requested URI contains a query.
-            client.Headers.Add("User-Agent", JustJournalCore.Version);
-
-            // Add necessary parameter/value pairs to the name/value container.
-
-            myNameValueCollection.Add("user", JustJournalCore.UserName);
-            myNameValueCollection.Add("pass", JustJournalCore.Password);
-            myNameValueCollection.Add("keeplogin", "NO");
-            DateTime d1 = DateTime.Now;
-            //myNameValueCollection.Add("date", "2005-09-30 16:18:26");
-            myNameValueCollection.Add("date",
-                                      d1.Year + "-" + d1.Month + "-" + d1.Day + " " + d1.Hour + ":" + d1.Minute + ":" +
-                                      d1.Second);
-            myNameValueCollection.Add("subject", txtSubject.Text);
+            entry.Add("date", DateTime.Now.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", CultureInfo.InvariantCulture));
+            entry.Add("subject", txtSubject.Text);
 
             if (mnuFormattedText.Checked)
-                myNameValueCollection.Add("body", RtfToHtml.Convert(rtbBody.Rtf,
-                                                                    RtfToHtml.ToHexColor(rtbBody.BackColor.R,
-                                                                                         rtbBody.BackColor.G,
-                                                                                         rtbBody.BackColor.B)));
+            {
+                entry.Add("body", RtfToHtml.Convert(rtbBody.Rtf,
+                                                    RtfToHtml.ToHexColor(rtbBody.BackColor.R,
+                                                                         rtbBody.BackColor.G,
+                                                                         rtbBody.BackColor.B)));
+                entry.Add("format", "HTML");
+            }
             else
-                myNameValueCollection.Add("body", rtbBody.Text);
+            {
+                entry.Add("body", rtbBody.Text);
+                entry.Add("format", "TEXT");
+            }
 
             switch (cboSecurity.Text)
             {
                 case "public":
-                    myNameValueCollection.Add("security", "2");
+                    entry.Add("security", 2);
                     break;
                 case "friends":
-                    myNameValueCollection.Add("security", "1");
+                    entry.Add("security", 1);
                     break;
                 case "private":
-                    myNameValueCollection.Add("security", "0");
+                    entry.Add("security", 0);
                     break;
                 default:
-                    myNameValueCollection.Add("security", "0");
+                    entry.Add("security", 0);
                     break;
             }
 
             switch (cboLocation.Text)
             {
                 case "Home":
-                    myNameValueCollection.Add("location", "1");
+                    entry.Add("location", 1);
                     break;
                 case "Other":
-                    myNameValueCollection.Add("location", "5");
+                    entry.Add("location", 5);
                     break;
                 case "Work":
-                    myNameValueCollection.Add("location", "2");
+                    entry.Add("location", 2);
                     break;
                 case "School":
-                    myNameValueCollection.Add("location", "3");
+                    entry.Add("location", 3);
                     break;
                 default:
                     // not specified case
-                    myNameValueCollection.Add("location", "0");
+                    entry.Add("location", 0);
                     break;
             }
 
-            myNameValueCollection.Add("mood", cboMood.SelectedValue.ToString());
-            myNameValueCollection.Add("music", txtMusic.Text);
-            myNameValueCollection.Add("tags", txtTags.Text);
+            int mood;
+            entry.Add("mood",
+                      cboMood.SelectedValue != null && int.TryParse(cboMood.SelectedValue.ToString(), out mood)
+                          ? mood
+                          : 0);
+            entry.Add("music", txtMusic.Text);
+            entry.Add("tags", txtTags.Text.Split(new[] {',', ' ', '\t'}, StringSplitOptions.RemoveEmptyEntries));
 
-            myNameValueCollection.Add("aformat", string.Empty);
+            entry.Add("autoFormat", false);
+            entry.Add("allowComments", mEntryAllowComments.Checked);
+            entry.Add("emailComments", mEntryEmailComments.Checked);
 
-            if (mEntryAllowComments.Checked)
-                myNameValueCollection.Add("allow_comment", "checked");
+            string uriString = JustJournalCore.BaseUrl + "/api/entry";
+            Dictionary<string, object> resp;
+            HttpStatusCode status;
+            try
+            {
+                resp = JustJournalCore.SendJson("POST", uriString, entry, out status);
 
-            if (mEntryEmailComments.Checked)
-                myNameValueCollection.Add("email_comment", "checked");
+                // the session may have expired while the entry was written
+                if (status == HttpStatusCode.Forbidden && JustJournalCore.Login() == JustJournalCore.LoginOk)
+                    resp = JustJournalCore.SendJson("POST", uriString, entry, out status);
+            }
+            catch (WebException ex)
+            {
+                Cursor = Cursors.Default;
+                Enabled = true;
+                MessageBox.Show(ex.Message, @"Just Journal", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                return;
+            }
 
-            // Upload the NameValueCollection.
-            byte[] responseArray = client.UploadValues(uriString, "POST", myNameValueCollection);
-
-            // Decode and display the response.
-            //Console.WriteLine("\nResponse received was :\n{0}",Encoding.ASCII.GetString(responseArray));
             Cursor = Cursors.Default;
             Enabled = true;
 
-            string resp = Encoding.ASCII.GetString(responseArray);
-            if (resp.Length > 0 && resp.IndexOf("JJ.LOGIN.OK", StringComparison.Ordinal) == -1)
+            if (status == HttpStatusCode.OK && resp.ContainsKey("id"))
             {
 // ReSharper disable ObjectCreationAsStatement
                 new Alert(string.Format("Message \"{0}\" Posted.", txtSubject.Text), "");
@@ -315,7 +314,10 @@ namespace JustJournal
             }
             else
             {
-                MessageBox.Show(Encoding.ASCII.GetString(responseArray), @"Just Journal",
+                string error = resp.ContainsKey("error")
+                                   ? Convert.ToString(resp["error"])
+                                   : "Unable to post the entry (" + (int) status + ").";
+                MessageBox.Show(error, @"Just Journal",
                                 MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
             }
         }

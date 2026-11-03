@@ -183,7 +183,8 @@ namespace JustJournal
 
             try
             {
-                if (JustJournalCore.Login())
+                string error;
+                if (LogIn(out error))
                 {
                     Enabled = true;
                     Cursor = Cursors.Default;
@@ -228,9 +229,9 @@ namespace JustJournal
                 }
                 else
                 {
-                    MessageBox.Show(@"Unable to login.  Make sure your username and password are correct.",
-                                    @"Authentication Error",
-                                    MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                    if (error != null)
+                        MessageBox.Show(error, @"Authentication Error",
+                                        MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 
                     Enabled = true;
                     Cursor = Cursors.Default;
@@ -241,6 +242,79 @@ namespace JustJournal
                 MessageBox.Show(this, ex.Message, @"Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                 Enabled = true;
                 Cursor = Cursors.Default;
+            }
+        }
+
+        /// <summary>
+        ///     Log in, asking for the second factor code when the account has one.
+        /// </summary>
+        /// <param name="error">why the login failed, or null when the user cancelled</param>
+        private bool LogIn(out string error)
+        {
+            error = null;
+            string status = JustJournalCore.Login();
+            if (status == JustJournalCore.LoginOk)
+                return true;
+            if (status != JustJournalCore.LoginTwoFactorNeeded)
+            {
+                error = "Unable to login.  Make sure your username and password are correct.";
+                return false;
+            }
+
+            string prompt = JustJournalCore.TwoFactorMethod == "EMAIL"
+                                ? "Enter the code Just Journal e-mailed you, or a recovery code."
+                                : "Enter the code from your authenticator app, or a recovery code.";
+            string message = prompt;
+            bool retry = true;
+            while (retry)
+            {
+                string code = PromptForCode(message);
+                if (code == null)
+                    return false;
+
+                if (JustJournalCore.LoginTwoFactor(code, out retry) == JustJournalCore.LoginOk)
+                    return true;
+
+                message = "That code didn't work. " + prompt;
+            }
+
+            error = "Too many wrong codes, or the login expired.  Please log in again.";
+            return false;
+        }
+
+        /// <returns>the code entered, or null when cancelled</returns>
+        private string PromptForCode(string prompt)
+        {
+            using (var dialog = new Form())
+            {
+                var label = new Label();
+                var code = new TextBox();
+                var ok = new Button();
+                var cancel = new Button();
+
+                dialog.Text = @"Two-Factor Login";
+                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.MinimizeBox = false;
+                dialog.MaximizeBox = false;
+                dialog.ShowInTaskbar = false;
+                dialog.ClientSize = new System.Drawing.Size(320, 110);
+
+                label.SetBounds(12, 12, 296, 32);
+                label.Text = prompt;
+                code.SetBounds(12, 48, 296, 20);
+                ok.SetBounds(152, 78, 75, 23);
+                ok.Text = @"OK";
+                ok.DialogResult = DialogResult.OK;
+                cancel.SetBounds(233, 78, 75, 23);
+                cancel.Text = @"Cancel";
+                cancel.DialogResult = DialogResult.Cancel;
+
+                dialog.Controls.AddRange(new Control[] {label, code, ok, cancel});
+                dialog.AcceptButton = ok;
+                dialog.CancelButton = cancel;
+
+                return dialog.ShowDialog(this) == DialogResult.OK ? code.Text.Trim() : null;
             }
         }
 
@@ -305,27 +379,27 @@ namespace JustJournal
 
         private void menuItem15_Click(object sender, EventArgs e)
         {
-            Process.Start("http://www.justjournal.com/users/" + JustJournalCore.UserName);
+            Process.Start("https://www.justjournal.com/users/" + JustJournalCore.UserName);
         }
 
         private void menuItem16_Click(object sender, EventArgs e)
         {
-            Process.Start("http://www.justjournal.com/users/" + JustJournalCore.UserName + "/friends");
+            Process.Start("https://www.justjournal.com/users/" + JustJournalCore.UserName + "/friends");
         }
 
         private void menuItem17_Click(object sender, EventArgs e)
         {
-            Process.Start("http://www.justjournal.com/users/" + JustJournalCore.UserName + "/calendar");
+            Process.Start("https://www.justjournal.com/users/" + JustJournalCore.UserName + "/calendar");
         }
 
         private void menuItem14_Click(object sender, EventArgs e)
         {
-            Process.Start("http://www.justjournal.com/");
+            Process.Start("https://www.justjournal.com/");
         }
 
         private void menuItem19_Click(object sender, EventArgs e)
         {
-            Process.Start("http://www.justjournal.com/profile.jsp?user=" + JustJournalCore.UserName);
+            Process.Start("https://www.justjournal.com/profile/" + JustJournalCore.UserName);
         }
 
         #region Windows Form Designer generated code
