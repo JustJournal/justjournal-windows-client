@@ -218,7 +218,9 @@ namespace JustJournal
 		/// <returns>LoginOk, LoginTwoFactorNeeded (finish with LoginTwoFactor), or LoginFail</returns>
 		public static string Login()
 		{
-			// a new login starts a new session
+			// a new login starts a new session, but a failed attempt (wrong password, rate
+			// limit, network error) keeps the session we already had
+			var previousCookies = _cookies;
 			_cookies = new CookieContainer();
 			_twoFactorMethod = null;
 
@@ -228,14 +230,24 @@ namespace JustJournal
 					{"password", _password}
 				};
 
-			HttpStatusCode status;
-			var resp = SendJson("POST", BaseUrl + "/api/login", login, out status);
-			var loginStatus = LoginStatus(resp);
+			string loginStatus = LoginFail;
+			try
+			{
+				HttpStatusCode status;
+				var resp = SendJson("POST", BaseUrl + "/api/login", login, out status);
+				loginStatus = LoginStatus(resp);
 
-			if (loginStatus == LoginTwoFactorNeeded && resp.ContainsKey("twoFactorMethod"))
-				_twoFactorMethod = Convert.ToString(resp["twoFactorMethod"]);
+				if (loginStatus == LoginTwoFactorNeeded && resp.ContainsKey("twoFactorMethod"))
+					_twoFactorMethod = Convert.ToString(resp["twoFactorMethod"]);
+			}
+			finally
+			{
+				if (loginStatus != LoginOk && loginStatus != LoginTwoFactorNeeded)
+					_cookies = previousCookies;
+			}
 
-			_loggedIn = loginStatus == LoginOk;
+			if (loginStatus != LoginFail)
+				_loggedIn = loginStatus == LoginOk;
 			return loginStatus;
 		}
 

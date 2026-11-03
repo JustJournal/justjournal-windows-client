@@ -287,8 +287,10 @@ namespace JustJournal
             {
                 resp = JustJournalCore.SendJson("POST", uriString, entry, out status);
 
-                // the session may have expired while the entry was written
-                if (status == HttpStatusCode.Forbidden && JustJournalCore.Login() == JustJournalCore.LoginOk)
+                // the session may have expired while the entry was written. Only the API's own
+                // {"error": ...} 403 means that; the web server's firewall also answers 403.
+                if (status == HttpStatusCode.Forbidden && resp.ContainsKey("error") &&
+                    JustJournalCore.Login() == JustJournalCore.LoginOk)
                     resp = JustJournalCore.SendJson("POST", uriString, entry, out status);
             }
             catch (WebException ex)
