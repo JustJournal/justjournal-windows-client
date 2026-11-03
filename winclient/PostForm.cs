@@ -9,9 +9,7 @@ using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
-using Microsoft.Office.Interop.Word;
 using Microsoft.Win32;
-using Application = Microsoft.Office.Interop.Word.Application;
 using Font = System.Drawing.Font;
 
 namespace JustJournal
@@ -200,10 +198,10 @@ namespace JustJournal
         {
             if (JustJournalCore.AutoSpellCheck)
             {
-                if (SpellingCheck())
+                if (!SpellingCheck())
                 {
                     if (MessageBox.Show(this,
-                                        @"A spelling error was found.  Do you wish to post anyway?", @"Spelling Error",
+                                        @"The spelling check didn't finish.  Do you wish to post anyway?", @"Spelling Error",
                                         MessageBoxButtons.YesNo) == DialogResult.No)
                     {
                         return;
@@ -816,54 +814,68 @@ namespace JustJournal
             }
         }
 
+        /// <summary>
+        ///     Walk through the misspelled words in the entry, asking what to do with each.
+        /// </summary>
+        /// <returns>true when every word was checked; false when cancelled or there is no dictionary</returns>
         private bool SpellingCheck()
         {
-            bool errors = false;
-            Object nul = null;
-
             try
             {
-                Application chk = new ApplicationClass();
-                int cur = 0;
-                var word = new StringBuilder();
-                while (cur < rtbBody.Text.Length)
+                if (!SpellCheck.Load())
                 {
-                    if (char.IsLetter(rtbBody.Text[cur]) || rtbBody.Text[cur].Equals('\''))
-                    {
-                        word.Append(rtbBody.Text[cur]);
-                    }
-                    else
-                    {
-                        if (word.Length != 0)
-                        {
-                            if (!chk.CheckSpelling(word.ToString(), ref nul, ref nul, ref nul, ref nul, ref nul,
-                                                   ref nul, ref nul, ref nul, ref nul, ref nul, ref nul, ref nul))
-                            {
-                                rtbBody.Select(cur - word.Length, word.Length);
-                                var ft = new Font(rtbBody.SelectionFont.Name, rtbBody.SelectionFont.Size,
-                                                  FontStyle.Strikeout);
-                                rtbBody.SelectionFont = ft;
-                                errors = true;
-                            }
-                            word.Remove(0, word.Length); // reset
-                        }
-                    }
-                    cur++;
+                    MessageBox.Show(this, @"No spelling dictionary was found in the dictionaries folder.",
+                                    @"Check Spelling", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                    return false;
                 }
-                rtbBody.Select(0, 0);
-                chk.Quit(ref nul, ref nul, ref nul);
             }
             catch (Exception x)
             {
                 MessageBox.Show(x.Message);
+                return false;
             }
 
-            return errors;
+            var ignored = new HashSet<string>();
+            int pos = 0;
+            int start, length;
+            while (SpellCheck.FindMisspelling(rtbBody.Text, pos, ignored, out start, out length))
+            {
+                rtbBody.Select(start, length);
+                rtbBody.ScrollToCaret();
+                string word = rtbBody.SelectedText;
+
+                using (var dialog = new SpellingDialog(word, SpellCheck.Suggest(word)))
+                {
+                    dialog.ShowDialog(this);
+                    switch (dialog.Choice)
+                    {
+                        case SpellingChoice.Change:
+                            // replacing the selection keeps the word's formatting
+                            rtbBody.SelectedText = dialog.Replacement;
+                            pos = start + dialog.Replacement.Length;
+                            break;
+                        case SpellingChoice.IgnoreAll:
+                            ignored.Add(word);
+                            pos = start + length;
+                            break;
+                        case SpellingChoice.Ignore:
+                            pos = start + length;
+                            break;
+                        default:
+                            return false;
+                    }
+                }
+            }
+
+            rtbBody.Select(Math.Min(pos, rtbBody.TextLength), 0);
+            return true;
         }
 
         private void menuItem31_Click(object sender, EventArgs e)
         {
-            SpellingCheck();
+            if (SpellingCheck())
+                MessageBox.Show(this, @"The spelling check is complete.", @"Check Spelling",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void toolStripButton1_Click(object sender, EventArgs e)
