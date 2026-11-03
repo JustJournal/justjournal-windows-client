@@ -305,7 +305,7 @@ namespace JustJournal
             this.groupBox3.Size = new System.Drawing.Size(408, 120);
             this.groupBox3.TabIndex = 0;
             this.groupBox3.TabStop = false;
-            this.groupBox3.Text = "Microsoft Office";
+            this.groupBox3.Text = "Spelling";
 
             // 
             // chkAutoSpell
@@ -322,7 +322,7 @@ namespace JustJournal
             this.chkUseWord.Name = "chkUseWord";
             this.chkUseWord.Size = new System.Drawing.Size(240, 24);
             this.chkUseWord.TabIndex = 0;
-            this.chkUseWord.Text = "Use Microsoft Word to spell check entries";
+            this.chkUseWord.Text = "Enable spell check";
             // 
             // btnClose
             // 
@@ -407,6 +407,7 @@ namespace JustJournal
 
 		        rk.SetValue("autologin", chkAutoLogin.Checked ? "yes" : "no");
 
+		        // "useword" is from when Word did the checking; kept so settings carry over
 		        if (chkUseWord.Checked)
 		        {
 		            JustJournalCore.EnableSpellCheck = true;
