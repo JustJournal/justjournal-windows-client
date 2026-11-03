@@ -96,7 +96,6 @@ namespace JustJournal
             JustJournalCore.EnableSpellCheck = ((string) rk.GetValue("useword", "no")).Equals("yes");
             JustJournalCore.AutoSpellCheck = ((string) rk.GetValue("autospell", "no")).Equals("yes");
             JustJournalCore.EnableMusicDetection = ((string) rk.GetValue("music", "no")).Equals("yes");
-            JustJournalCore.DetectItunes = ((string) rk.GetValue("iTunes", "no")).Equals("yes");
             if (mk != null)
             {
                 JustJournalCore.WinampPaused = ((string) mk.GetValue("winampPaused", "no")).Equals("yes");

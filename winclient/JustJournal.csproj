@@ -115,14 +115,6 @@
     <Reference Include="System.Xml">
       <Name>System.XML</Name>
     </Reference>
-    <COMReference Include="iTunesLib">
-      <Guid>{9E93C96F-CF0D-43F6-8BA8-B807A3370712}</Guid>
-      <VersionMajor>1</VersionMajor>
-      <VersionMinor>6</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>tlbimp</WrapperTool>
-      <Isolated>False</Isolated>
-    </COMReference>
     <COMReference Include="VBIDE">
       <Guid>{0002E157-0000-0000-C000-000000000046}</Guid>
       <VersionMajor>5</VersionMajor>
