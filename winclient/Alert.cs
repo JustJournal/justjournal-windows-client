@@ -32,9 +32,27 @@ namespace JustJournal
             int cx = Screen.PrimaryScreen.WorkingArea.Width - (w + 25);
             int cy = Screen.PrimaryScreen.WorkingArea.Height - h;
             SetBounds(cx, cy, w, h, BoundsSpecified.All);
-            ShowWindow(Handle, SW_SHOWNOACTIVATE);
-            SetWindowPos(Handle, HWND_TOPMOST, cx, cy, Width, Height, SWP_NOACTIVATE);
+            try
+            {
+                ShowWindow(Handle, SW_SHOWNOACTIVATE);
+                SetWindowPos(Handle, HWND_TOPMOST, cx, cy, Width, Height, SWP_NOACTIVATE);
+            }
+            catch (EntryPointNotFoundException)
+            {
+                ShowWithoutUser32();
+            }
+            catch (DllNotFoundException)
+            {
+                ShowWithoutUser32();
+            }
             timer1.Start();
+        }
+
+        // Mono outside Windows has no user32, so show it the WinForms way
+        private void ShowWithoutUser32()
+        {
+            TopMost = true;
+            Show();
         }
 
         [DllImport(dllName: "User32.dll")]
@@ -57,7 +75,18 @@ namespace JustJournal
 
         private void Alert_Load(object sender, EventArgs e)
         {
-            PlaySound("SystemNotification", 0, SND_ALIAS);
+            try
+            {
+                PlaySound("SystemNotification", 0, SND_ALIAS);
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // no winmm outside Windows; skip the sound
+            }
+            catch (DllNotFoundException)
+            {
+                // no winmm outside Windows; skip the sound
+            }
         }
 
         private void msg_MouseEnter(object sender, EventArgs e)
