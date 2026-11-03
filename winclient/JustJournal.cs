@@ -22,7 +22,6 @@ namespace JustJournal
 		
         private static bool _enableSpellCheck;
 		private static bool _autoSpellCheck;
-		private static bool _enableItunes;
 		private static bool _detectMusic;
 		private static bool _useSsl = true;
 		private static string _debug;
@@ -87,18 +86,6 @@ namespace JustJournal
 			set
 			{
 				_autoSpellCheck = value;
-			}
-		}
-
-		public static bool DetectItunes
-		{
-			get
-			{
-				return _enableItunes;
-			}
-			set
-			{
-				_enableItunes = value;
 			}
 		}
 

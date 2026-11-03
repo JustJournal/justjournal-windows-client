@@ -11,7 +11,6 @@ using System.Text;
 using System.Windows.Forms;
 using Microsoft.Office.Interop.Word;
 using Microsoft.Win32;
-using iTunesLib;
 using Application = Microsoft.Office.Interop.Word.Application;
 using Font = System.Drawing.Font;
 
@@ -575,39 +574,6 @@ namespace JustJournal
             // skip if we have it disabled.
             if (!JustJournalCore.EnableMusicDetection)
                 return "";
-
-            if (JustJournalCore.DetectItunes)
-            {
-                // iTunes Detection
-                try
-                {
-                    string name = string.Empty;
-                    IiTunes iTunesApp = new iTunesAppClass();
-
-                    if (iTunesApp.CurrentTrack.Name != null)
-                    {
-                        name += iTunesApp.CurrentTrack.Name;
-
-                        if (iTunesApp.CurrentTrack.Album != null)
-                        {
-                            name += " - ";
-                            name += iTunesApp.CurrentTrack.Album;
-                        }
-
-                        if (iTunesApp.CurrentTrack.Artist != null)
-                        {
-                            name += " - ";
-                            name += iTunesApp.CurrentTrack.Artist;
-                        }
-                    }
-                    return name;
-                }
-                catch
-                {
-                    //MessageBox.Show("iTunes Error",e.Message,
-                    //	MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                }
-            }
 
             // other clients
             {

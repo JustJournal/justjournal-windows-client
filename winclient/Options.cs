@@ -24,7 +24,6 @@ namespace JustJournal
 		private System.Windows.Forms.CheckBox chkAutoSpell;
 		private System.Windows.Forms.GroupBox groupBox4;
 		private System.Windows.Forms.CheckBox chkMusicDetect;
-		private System.Windows.Forms.CheckBox chkItunes;
 		private System.Windows.Forms.PictureBox pictureBox1;
 		private System.Windows.Forms.CheckBox chkPaused;
 		private System.Windows.Forms.CheckBox chkStopped;
@@ -58,7 +57,6 @@ namespace JustJournal
 		        chkUseWord.Checked = ((string)rk.GetValue( "useword", "no" )).Equals("yes");
 		        chkAutoSpell.Checked = ((string)rk.GetValue( "autospell", "no" )).Equals("yes");
 		        chkMusicDetect.Checked = ((string)rk.GetValue( "music", "no" )).Equals("yes");
-		        chkItunes.Checked = ((string)rk.GetValue( "iTunes", "no" )).Equals("yes");
 		        chkPaused.Checked = ((string)mk.GetValue( "winampPaused", "no")).Equals("yes");
 		        chkStopped.Checked = ((string)mk.GetValue( "winampStopped", "no")).Equals("yes");
 		
@@ -78,7 +76,6 @@ namespace JustJournal
 
 		    if (!chkMusicDetect.Checked)
             {
-                chkItunes.Enabled = false;
                 chkPaused.Enabled = false;
                 chkStopped.Enabled = false;
             }
@@ -126,7 +123,6 @@ namespace JustJournal
             this.groupBox5 = new System.Windows.Forms.GroupBox();
             this.chkPaused = new System.Windows.Forms.CheckBox();
             this.chkStopped = new System.Windows.Forms.CheckBox();
-            this.chkItunes = new System.Windows.Forms.CheckBox();
             this.chkMusicDetect = new System.Windows.Forms.CheckBox();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
@@ -244,7 +240,6 @@ namespace JustJournal
             // groupBox4
             // 
             this.groupBox4.Controls.Add(this.groupBox5);
-            this.groupBox4.Controls.Add(this.chkItunes);
             this.groupBox4.Controls.Add(this.chkMusicDetect);
             this.groupBox4.Controls.Add(this.pictureBox1);
             this.groupBox4.Location = new System.Drawing.Point(8, 144);
@@ -280,14 +275,6 @@ namespace JustJournal
             this.chkStopped.Size = new System.Drawing.Size(72, 24);
             this.chkStopped.TabIndex = 4;
             this.chkStopped.Text = "Stopped";
-            // 
-            // chkItunes
-            // 
-            this.chkItunes.Location = new System.Drawing.Point(24, 64);
-            this.chkItunes.Name = "chkItunes";
-            this.chkItunes.Size = new System.Drawing.Size(240, 24);
-            this.chkItunes.TabIndex = 1;
-            this.chkItunes.Text = "Enable Apple  iTunes integration";
             // 
             // chkMusicDetect
             // 
@@ -403,7 +390,6 @@ namespace JustJournal
 			*/
 		        // TODO finish this
 		        if (mk != null) mk.SetValue( "Formatting", (postFormatted.Checked ? "Formatted" : "Raw") );
-		        rk.SetValue( "iTunes", (chkItunes.Checked ? "yes" : "no"));
 		        rk.SetValue( "music", (chkMusicDetect.Checked ? "yes" : "no"));
 		        if (mk != null)
 		        {
@@ -411,7 +397,6 @@ namespace JustJournal
 		            mk.SetValue( "winampStopped", (chkStopped.Checked ? "yes" : "no"));
 		        }
 
-		        JustJournalCore.DetectItunes = chkItunes.Checked;
 		        JustJournalCore.EnableMusicDetection = chkMusicDetect.Checked;
 		        JustJournalCore.WinampPaused = chkPaused.Checked;
 		        JustJournalCore.WinampStopped = chkStopped.Checked;
@@ -462,13 +447,11 @@ namespace JustJournal
         {
             if (!chkMusicDetect.Checked)
             {
-                chkItunes.Enabled = false;
                 chkPaused.Enabled = false;
                 chkStopped.Enabled = false;
             }
             else
             {
-                chkItunes.Enabled = true;
                 chkPaused.Enabled = true;
                 chkStopped.Enabled = true;
             }
