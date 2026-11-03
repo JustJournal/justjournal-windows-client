@@ -90,6 +90,13 @@ namespace JustJournal
 				+ System.Convert.ToString( blue, 16 ).PadLeft( 2, '0' );
 		}
 
+		// Mono's RichTextBox writes \cf1 without a \colortbl, so a missing color means none
+		private static string TableColor( Hashtable colorTable, string index )
+		{
+			object color = colorTable[System.Convert.ToInt32( index )];
+			return color == null ? string.Empty : color.ToString();
+		}
+
 		public static string Convert( string rtf, string bgcolor )
 		{
 			try
@@ -99,6 +106,10 @@ namespace JustJournal
 				//sw.Write( rtf );
 				//sw.Close();
 				#endregion
+				// drop ignorable groups like {\*\generator Mono RichTextBox;}, which aren't text,
+				// and space out Mono's "\colortbl;" so it reads like RichEdit's "\colortbl ;"
+				rtf = Regex.Replace( rtf, @"\{\\\*\\[^{}]*\}", string.Empty ).Replace( @"\colortbl;", @"\colortbl ;" );
+
 				Hashtable fontTable = new Hashtable();
 				Hashtable colorTable = new Hashtable();
 				string result = string.Empty;
@@ -226,7 +237,7 @@ namespace JustJournal
 							}
 							else if( tg.StartsWith( "highlight" ) )
 							{
-								string color = colorTable[System.Convert.ToInt32( tg.Substring( 9 ) )].ToString();
+								string color = TableColor( colorTable, tg.Substring( 9 ) );
 								if( color.Length > 0 )
 								{
 									result += "<span style=\"background-color:" + color + ";\">";
@@ -235,7 +246,7 @@ namespace JustJournal
 							}
 							else if( tg.StartsWith( "cf" ) )
 							{
-								string color = colorTable[System.Convert.ToInt32( tg.Substring( 2 ) )].ToString();
+								string color = TableColor( colorTable, tg.Substring( 2 ) );
 								if( color.Length > 0 )
 								{
 									result += "<span style=\"color:" + color + ";\">";
