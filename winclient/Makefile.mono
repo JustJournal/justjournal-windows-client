@@ -2,7 +2,7 @@
 all: clean resources justjournal.exe
 
 justjournal.exe: About.cs Options.cs Login.cs PostForm.cs Mood.cs RtfToHtml.cs JustJournal.cs
-	gmcs -pkg:dotnet -out:justjournal.exe -resource:JustJournal.AboutForm.resources About.cs -resource:JustJournal.Login.resources Login.cs -resource:JustJournal.Options.resources Options.cs -resource:JustJournal.PostForm.resources PostForm.cs JustJournal.cs Mood.cs RtfToHtml.cs
+	gmcs -pkg:dotnet -r:System.Web.Extensions.dll -out:justjournal.exe -resource:JustJournal.AboutForm.resources About.cs -resource:JustJournal.Login.resources Login.cs -resource:JustJournal.Options.resources Options.cs -resource:JustJournal.PostForm.resources PostForm.cs JustJournal.cs Mood.cs RtfToHtml.cs
 
 resources: About.resx Login.resx Options.resx PostForm.resx
 	resgen About.resx JustJournal.AboutForm.resources
