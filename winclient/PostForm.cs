@@ -313,9 +313,13 @@ namespace JustJournal
             }
             else
             {
-                string error = resp.ContainsKey("error")
-                                   ? Convert.ToString(resp["error"])
-                                   : "Unable to post the entry (" + (int) status + ").";
+                string error;
+                if (resp.ContainsKey("error"))
+                    error = Convert.ToString(resp["error"]);
+                else if (status == JustJournalCore.TooManyRequests)
+                    error = JustJournalCore.TooManyRequestsMessage;
+                else
+                    error = "Unable to post the entry (" + (int) status + ").";
                 MessageBox.Show(error, @"Just Journal",
                                 MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
             }
