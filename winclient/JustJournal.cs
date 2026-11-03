@@ -208,6 +208,8 @@ namespace JustJournal
 		{
 			// .NET 4.5 doesn't offer TLS 1.2 by default
 			ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+			// the web server answers POSTs sent with Expect: 100-continue with a 403
+			ServicePointManager.Expect100Continue = false;
 		}
 
 		/// <summary>
