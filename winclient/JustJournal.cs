@@ -178,6 +178,15 @@ namespace JustJournal
 		public const string LoginFail = "JJ.LOGIN.FAIL";
 		public const string LoginTwoFactorNeeded = "JJ.LOGIN.2FA";
 
+		// Not from the server: the site's rate limit answered 429 before the login was checked
+		public const string LoginTooManyRequests = "TOO_MANY_REQUESTS";
+
+		public const string TooManyRequestsMessage =
+			"Just Journal is getting too many requests from this computer.  Please wait a minute and try again.";
+
+		// HttpStatusCode has no name for 429 in .NET 4.5
+		public const HttpStatusCode TooManyRequests = (HttpStatusCode) 429;
+
 		private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
 
 		// The session cookie from /api/login, kept in memory only.
@@ -235,7 +244,7 @@ namespace JustJournal
 			{
 				HttpStatusCode status;
 				var resp = SendJson("POST", BaseUrl + "/api/login", login, out status);
-				loginStatus = LoginStatus(resp);
+				loginStatus = status == TooManyRequests ? LoginTooManyRequests : LoginStatus(resp);
 
 				if (loginStatus == LoginTwoFactorNeeded && resp.ContainsKey("twoFactorMethod"))
 					_twoFactorMethod = Convert.ToString(resp["twoFactorMethod"]);
@@ -246,7 +255,7 @@ namespace JustJournal
 					_cookies = previousCookies;
 			}
 
-			if (loginStatus != LoginFail)
+			if (loginStatus == LoginOk || loginStatus == LoginTwoFactorNeeded)
 				_loggedIn = loginStatus == LoginOk;
 			return loginStatus;
 		}
@@ -255,8 +264,8 @@ namespace JustJournal
 		/// Finish a login that returned LoginTwoFactorNeeded.
 		/// </summary>
 		/// <param name="code">code from the e-mail, authenticator app or recovery list</param>
-		/// <param name="retry">true when only the code was wrong; false when the login must start over</param>
-		/// <returns>LoginOk or LoginFail</returns>
+		/// <param name="retry">true when the code can be tried again; false when the login must start over</param>
+		/// <returns>LoginOk, LoginTooManyRequests, or LoginFail</returns>
 		public static string LoginTwoFactor(string code, out bool retry)
 		{
 			var body = new Dictionary<string, object>
@@ -269,7 +278,14 @@ namespace JustJournal
 			var resp = SendJson("POST", BaseUrl + "/api/login/2fa", body, out status);
 			var loginStatus = LoginStatus(resp);
 
-			// 401 JJ.LOGIN.FAIL is a wrong code; 429 means too many wrong codes, and
+			// the site's rate limit answers 429 without a login status; the code wasn't checked
+			if (status == TooManyRequests && !resp.ContainsKey("status"))
+			{
+				retry = true;
+				return LoginTooManyRequests;
+			}
+
+			// 401 JJ.LOGIN.FAIL is a wrong code; 429 JJ.LOGIN.FAIL means too many wrong codes, and
 			// JJ.LOGIN.NONE means the pending login expired
 			retry = loginStatus == LoginFail && status == HttpStatusCode.Unauthorized;
 

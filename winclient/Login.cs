@@ -254,6 +254,11 @@ namespace JustJournal
             string status = JustJournalCore.Login();
             if (status == JustJournalCore.LoginOk)
                 return true;
+            if (status == JustJournalCore.LoginTooManyRequests)
+            {
+                error = JustJournalCore.TooManyRequestsMessage;
+                return false;
+            }
             if (status != JustJournalCore.LoginTwoFactorNeeded)
             {
                 error = "Unable to login.  Make sure your username and password are correct.";
@@ -271,10 +276,13 @@ namespace JustJournal
                 if (code == null)
                     return false;
 
-                if (JustJournalCore.LoginTwoFactor(code, out retry) == JustJournalCore.LoginOk)
+                string result = JustJournalCore.LoginTwoFactor(code, out retry);
+                if (result == JustJournalCore.LoginOk)
                     return true;
 
-                message = "That code didn't work. " + prompt;
+                message = (result == JustJournalCore.LoginTooManyRequests
+                               ? JustJournalCore.TooManyRequestsMessage
+                               : "That code didn't work.") + " " + prompt;
             }
 
             error = "Too many wrong codes, or the login expired.  Please log in again.";
